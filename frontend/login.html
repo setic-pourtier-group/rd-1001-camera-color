@@ -1,0 +1,117 @@
+﻿<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Connexion - Setic Vision</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-900 text-white h-screen flex items-center justify-center font-sans relative">
+
+    <div class="absolute top-6 right-6">
+        <button onclick="toggleLanguage()" id="btnLang" class="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 border border-slate-600 px-4 py-2 rounded text-blue-300 font-bold transition shadow-lg">
+            🇬🇧 EN
+        </button>
+    </div>
+
+    <div class="bg-slate-800 p-8 rounded-xl shadow-2xl w-full max-w-md border border-slate-700">
+        <div class="flex justify-center mb-8">
+            <img src="image_4.jpg" alt="Logo" class="h-14 w-auto object-contain bg-white/10 p-2 rounded">
+        </div>
+
+        <h2 id="txtTitle" class="text-2xl font-bold text-center mb-6 text-blue-400">Accès Sécurisé</h2>
+
+        <form id="loginForm" class="space-y-6">
+            <div>
+                <label id="lblUser" class="block text-sm font-medium text-gray-400 mb-2">Identifiant</label>
+                <input type="text" id="username" class="w-full bg-slate-900 border border-slate-600 rounded p-3 text-white focus:border-blue-500 focus:outline-none placeholder-gray-600" placeholder="admin">
+            </div>
+
+            <div>
+                <label id="lblPass" class="block text-sm font-medium text-gray-400 mb-2">Mot de passe</label>
+                <input type="password" id="password" class="w-full bg-slate-900 border border-slate-600 rounded p-3 text-white focus:border-blue-500 focus:outline-none placeholder-gray-600" placeholder="••••••">
+            </div>
+
+            <div id="errorMsg" class="text-red-500 text-sm text-center hidden bg-red-500/10 p-2 rounded border border-red-500/50">
+                Identifiants incorrects
+            </div>
+
+            <button type="submit" id="btnLogin" class="w-full bg-blue-600 hover:bg-blue-500 py-3 rounded-lg font-bold transition shadow-lg shadow-blue-500/20">
+                SE CONNECTER
+            </button>
+        </form>
+    </div>
+
+    <script>
+        // --- GESTION LANGUES ---
+        // On récupère la langue sauvegardée ou 'fr' par défaut
+        let currentLang = localStorage.getItem('lang') || 'fr';
+
+        const translations = {
+            fr: {
+                btnLang: "🇬🇧 EN",
+                title: "Accès Sécurisé",
+                lblUser: "Identifiant",
+                lblPass: "Mot de passe",
+                btnLogin: "SE CONNECTER",
+                errorMsg: "⚠️ Identifiants incorrects"
+            },
+            en: {
+                btnLang: "🇫🇷 FR",
+                title: "Secure Access",
+                lblUser: "Username",
+                lblPass: "Password",
+                btnLogin: "LOGIN",
+                errorMsg: "⚠️ Invalid credentials"
+            }
+        };
+
+        function toggleLanguage() {
+            currentLang = currentLang === 'fr' ? 'en' : 'fr';
+            localStorage.setItem('lang', currentLang); // Sauvegarde pour la page suivante
+            updateInterface();
+        }
+
+        function updateInterface() {
+            const t = translations[currentLang];
+            
+            document.getElementById('btnLang').innerText = t.btnLang;
+            document.getElementById('txtTitle').innerText = t.title;
+            document.getElementById('lblUser').innerText = t.lblUser;
+            document.getElementById('lblPass').innerText = t.lblPass;
+            document.getElementById('btnLogin').innerText = t.btnLogin;
+            document.getElementById('errorMsg').innerText = t.errorMsg;
+        }
+
+        // Appliquer la langue au chargement de la page
+        updateInterface();
+
+        // --- GESTION CONNEXION ---
+        document.getElementById('loginForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const user = document.getElementById('username').value;
+            const pass = document.getElementById('password').value;
+
+            try {
+                const res = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({username: user, password: pass})
+                });
+
+                if (res.ok) {
+                    window.location.href = "/"; // Redirection vers le tableau de bord
+                } else {
+                    document.getElementById('errorMsg').classList.remove('hidden');
+                    // Animation de vibration en cas d'erreur
+                    const box = document.querySelector('.max-w-md');
+                    box.classList.add('animate-pulse');
+                    setTimeout(() => box.classList.remove('animate-pulse'), 200);
+                }
+            } catch (err) {
+                console.error(err);
+            }
+        };
+    </script>
+</body>
+</html>

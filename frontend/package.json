@@ -1,0 +1,11 @@
+{
+  "name": "setic-vision-bun",
+  "module": "backend/server.ts",
+  "type": "module",
+  "dependencies": {
+    "nodes7": "^0.3.12"
+  },
+  "devDependencies": {
+    "bun-types": "latest"
+  }
+}

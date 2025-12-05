@@ -1,0 +1,15 @@
+{
+  "name": "setic-vision-s7",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "nodes7": "^0.3.18"
+  }
+}

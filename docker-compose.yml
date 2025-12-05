@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  vision-app:
+    build:
+      context: .
+      dockerfile: ci/Dockerfile
+    container_name: setic_vision_bun
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      - PLC_IP=192.168.0.1  # Adresse de l'automate
+    volumes:
+      - ./data_logs:/app/logs # Stockage SSD
