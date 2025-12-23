@@ -10,6 +10,10 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - PLC_IP=192.168.0.1  # Adresse de l'automate
+      - PLC_IP=192.168.0.1
+    # Accès à la caméra USB du Raspberry Pi
+    devices:
+      - /dev/video0:/dev/video0
+    # Stockage SSD
     volumes:
-      - ./data_logs:/app/logs # Stockage SSD
+      - ./data_logs:/app/logs

@@ -1,25 +1,25 @@
-﻿# Utilise l'image officielle Bun
-FROM oven/bun:1
+﻿FROM oven/bun:1
 
 WORKDIR /app
 
-# Copier les fichiers de config
+# Installer FFmpeg pour la capture vidéo
+RUN apt-get update && apt-get install -y ffmpeg
+
+# Copier les fichiers de dépendances
 COPY package.json ./
 COPY bun.lockb* ./
 
-# Installer les dépendances (nodes7)
+# Installer les dépendances JS (nodes7)
 RUN bun install --production
 
-# Copier le code
+# Copier tout le code
 COPY backend ./backend
 COPY frontend ./frontend
 
-# Variables d'environnement
+# Configuration
 ENV NODE_ENV=production
 ENV PLC_IP=192.168.0.1
 
-# Exposer le port
 EXPOSE 3000
 
-# Lancer
 CMD ["bun", "backend/server.ts"]

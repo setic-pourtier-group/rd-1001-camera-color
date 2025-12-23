@@ -3,384 +3,167 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Setic Vision S7 - RGB Analysis</title>
+    <title>Setic Vision S7 - Streaming</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        .fade-in { animation: fadeIn 0.3s ease-in-out; }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-    </style>
 </head>
 <body class="bg-slate-900 text-white p-6 font-sans">
     <div class="max-w-6xl mx-auto">
-        
         <header class="flex justify-between items-center mb-6 border-b border-slate-700 pb-4">
-            <div class="flex items-center gap-6">
-                <img src="image_4.jpg" alt="Logo SETIC" class="h-16 w-auto object-contain bg-white/10 rounded p-1">
-                <div id="status" class="px-4 py-2 bg-green-600 rounded font-bold text-sm tracking-wider shadow-lg transition-all duration-300">
-                    PLC: OK (0)
-                </div>
-            </div>
-            
-            <div class="flex gap-3">
-                <button onclick="toggleLanguage()" id="btnLang" class="text-sm bg-slate-800 hover:bg-slate-700 border border-slate-600 text-blue-300 px-3 py-2 rounded transition font-bold">
-                    🇬🇧 EN
-                </button>
-
-                <button onclick="toggleView('history')" class="flex items-center gap-2 text-sm bg-indigo-600 hover:bg-indigo-500 border border-indigo-400 text-white px-4 py-2 rounded transition shadow-lg">
-                    <span id="txtHistoryBtn">📜 Historique</span>
-                </button>
-
-                <button onclick="openExportModal()" class="flex items-center gap-2 text-sm bg-slate-700 hover:bg-slate-600 border border-slate-500 text-white px-4 py-2 rounded transition">
-                    <span id="txtExportBtn">📥 Exporter</span>
-                    <span id="logCount" class="bg-blue-600 text-xs px-2 py-0.5 rounded-full">0</span>
-                </button>
-
-                <button onclick="logout()" class="flex items-center gap-2 text-sm text-gray-400 hover:text-white border border-gray-600 px-4 py-2 rounded hover:bg-slate-700 transition">
-                    <span id="txtLogout">Déconnexion</span>
-                </button>
-            </div>
+            <h1 class="text-2xl font-bold text-blue-400">Setic Vision Supervision</h1>
+            <div id="status" class="px-4 py-2 bg-green-600 rounded font-bold text-sm">PLC: OK</div>
         </header>
 
-        <div id="dashboardView" class="fade-in">
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div class="flex flex-col gap-6">
+                <div id="alarmIndicator" class="bg-slate-800 border-4 border-slate-600 rounded-xl p-6 flex items-center justify-center min-h-[120px]">
+                    <h2 id="txtSystemStatus" class="text-2xl font-bold text-gray-400">SYSTÈME OK</h2>
+                </div>
+
+                <div class="bg-slate-800 p-6 rounded-xl border border-slate-700 space-y-4">
+                    <button id="btnStart" class="w-full bg-blue-600 hover:bg-blue-500 py-4 rounded-lg font-bold text-lg">▶ CONNECTER CAMÉRA</button>
+                    <button id="btnReset" class="w-full bg-orange-600 py-4 rounded-lg font-bold opacity-50 cursor-not-allowed" disabled>↺ RESET DÉFAUT</button>
+                    
+                    <div class="pt-4 border-t border-slate-700">
+                        <label class="block text-gray-400 mb-2">Couleur Cible</label>
+                        <input type="color" id="colorPicker" value="#0050ff" class="w-full h-10 rounded cursor-pointer">
+                    </div>
+                    <div>
+                        <div class="flex justify-between"><label class="text-gray-400">Tolérance</label><span id="lblTol" class="text-blue-400">30</span></div>
+                        <input type="range" id="rngTol" min="5" max="100" value="30" class="w-full h-2 bg-slate-600 rounded-lg">
+                    </div>
+                    <div>
+                        <div class="flex justify-between"><label class="text-gray-400">Surface Min (px)</label><span id="lblArea" class="text-blue-400">500</span></div>
+                        <input type="range" id="rngArea" min="100" max="5000" value="500" class="w-full h-2 bg-slate-600 rounded-lg">
+                    </div>
+                </div>
+            </div>
+
+            <div class="relative bg-black rounded-xl border-2 border-slate-700 flex justify-center items-center overflow-hidden shadow-2xl min-h-[400px]">
+                <img id="videoStream" src="" class="absolute inset-0 w-full h-full object-contain" crossorigin="anonymous">
+                <canvas id="outputCanvas" class="relative z-10 w-full h-full object-contain"></canvas>
                 
-                <div class="flex flex-col gap-6">
-                    <div id="alarmIndicator" class="bg-slate-800 border-4 border-slate-600 rounded-xl p-6 flex items-center justify-center shadow-inner transition-all duration-300 min-h-[120px]">
-                        <div class="text-center">
-                            <div id="iconStatus" class="text-4xl mb-2">✅</div>
-                            <h2 id="txtSystemStatus" class="text-2xl font-bold text-gray-400 tracking-widest">SYSTÈME OK</h2>
-                        </div>
-                    </div>
-
-                    <div class="bg-slate-800 p-6 rounded-xl shadow-xl flex flex-col gap-6 border border-slate-700">
-                        <h2 id="txtPanelTitle" class="text-xl font-bold text-blue-400 border-b border-slate-700 pb-2">Panneau de Commande</h2>
-
-                        <div class="grid grid-cols-2 gap-4">
-                            <button id="btnStart" class="bg-blue-600 hover:bg-blue-500 py-4 rounded-lg font-bold transition shadow-lg text-lg">
-                                ▶ DÉMARRER
-                            </button>
-                            <button id="btnReset" class="bg-orange-600 hover:bg-orange-500 py-4 rounded-lg font-bold transition opacity-50 cursor-not-allowed shadow-lg" disabled>
-                                ↺ RESET PLC
-                            </button>
-                        </div>
-                        
-                        <div class="space-y-6 pt-2">
-                            <div class="bg-slate-900 p-4 rounded-lg">
-                                <label id="txtTargetColor" class="block text-sm text-gray-400 mb-2 font-semibold">Couleur Cible</label>
-                                <div class="flex items-center gap-4">
-                                    <input type="color" id="colorPicker" value="#0050ff" class="w-16 h-12 rounded cursor-pointer border-2 border-slate-600">
-                                    <span id="txtCalibrateTip" class="text-xs text-gray-500">Cliquez pour calibrer</span>
-                                </div>
-                            </div>
-                            
-                            <div>
-                                <div class="flex justify-between mb-1">
-                                    <label id="txtTolerance" class="text-sm text-gray-400 font-semibold">Tolérance</label>
-                                    <span id="lblTol" class="text-blue-400 font-mono">30</span>
-                                </div>
-                                <input type="range" id="rngTol" min="5" max="100" value="30" class="w-full h-2 bg-slate-600 rounded-lg appearance-none cursor-pointer">
-                            </div>
-
-                            <div>
-                                <div class="flex justify-between mb-1">
-                                    <label id="txtMinArea" class="text-sm text-gray-400 font-semibold">Surface Min (px)</label>
-                                    <span id="lblArea" class="text-blue-400 font-mono">500</span>
-                                </div>
-                                <input type="range" id="rngArea" min="100" max="5000" value="500" class="w-full h-2 bg-slate-600 rounded-lg appearance-none cursor-pointer">
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="relative bg-black rounded-xl border-2 border-slate-700 flex justify-center items-center overflow-hidden shadow-2xl min-h-[400px]">
-                    <canvas id="outputCanvas" class="w-full h-auto object-contain"></canvas>
-                    <div id="waitingOverlay" class="absolute inset-0 flex items-center justify-center text-gray-500 pointer-events-none">
-                        <span class="text-lg">Caméra en attente...</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div id="historyView" class="hidden fade-in">
-            <div class="bg-slate-800 rounded-xl shadow-xl border border-slate-700 p-6">
-                <div class="flex justify-between items-center mb-6">
-                    <h2 id="txtHistoryTitle" class="text-2xl font-bold text-indigo-400">📜 Journal des Données</h2>
-                    <button onclick="toggleView('dashboard')" class="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded text-white flex items-center gap-2 transition">
-                        ⬅ <span id="txtBackBtn">Retour Caméra</span>
-                    </button>
-                </div>
-                <div class="overflow-x-auto max-h-[600px] border border-slate-600 rounded-lg">
-                    <table class="w-full text-left border-collapse">
-                        <thead class="bg-slate-700 text-gray-300 sticky top-0 z-10">
-                            <tr>
-                                <th id="thDate" class="p-4 font-semibold border-b border-slate-600">Date</th>
-                                <th id="thTime" class="p-4 font-semibold border-b border-slate-600">Heure</th>
-                                <th id="thStatus" class="p-4 font-semibold border-b border-slate-600">État</th>
-                                <th id="thPixels" class="p-4 font-semibold border-b border-slate-600">Pixels</th>
-                            </tr>
-                        </thead>
-                        <tbody id="historyTableBody" class="bg-slate-800 divide-y divide-slate-700 text-sm">
-                            <tr><td colspan="4" class="p-8 text-center text-gray-500 italic">Aucune donnée.</td></tr>
-                        </tbody>
-                    </table>
+                <div id="waitingOverlay" class="absolute inset-0 flex items-center justify-center text-gray-500 pointer-events-none">
+                    <span class="text-lg">En attente de connexion...</span>
                 </div>
             </div>
         </div>
     </div>
-
-    <div id="exportModal" class="fixed inset-0 bg-black/80 hidden flex items-center justify-center z-50 backdrop-blur-sm">
-        <div class="bg-slate-800 p-8 rounded-xl shadow-2xl border border-slate-600 w-full max-w-md">
-            <h3 id="txtExportTitle" class="text-xl font-bold text-white mb-4 flex items-center gap-2">📥 Exporter l'historique</h3>
-            <div class="space-y-4">
-                <div>
-                    <label id="txtDateStart" class="block text-sm text-gray-400 mb-1">Date Début</label>
-                    <input type="datetime-local" id="exportStart" class="w-full bg-slate-900 border border-slate-600 rounded p-2 text-white">
-                </div>
-                <div>
-                    <label id="txtDateEnd" class="block text-sm text-gray-400 mb-1">Date Fin</label>
-                    <input type="datetime-local" id="exportEnd" class="w-full bg-slate-900 border border-slate-600 rounded p-2 text-white">
-                </div>
-                <div class="flex gap-3 mt-6">
-                    <button id="txtCancel" onclick="closeExportModal()" class="flex-1 bg-slate-700 hover:bg-slate-600 py-2 rounded text-gray-200">Annuler</button>
-                    <button id="txtDownload" onclick="processExport()" class="flex-1 bg-blue-600 hover:bg-blue-500 py-2 rounded text-white font-bold">Télécharger</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <video id="video" style="display:none" playsinline></video>
 
     <script>
-        // --- DICTIONNAIRE ---
-        let currentLang = localStorage.getItem('lang') || 'fr';
-        const translations = {
-            fr: {
-                btnStart: "▶ DÉMARRER", btnStartActive: "● ANALYSE ACTIVE", btnReset: "↺ RESET PLC",
-                txtExportBtn: "📥 Exporter", txtHistoryBtn: "📜 Historique", txtLogout: "Déconnexion", txtBackBtn: "Retour Caméra",
-                txtPanelTitle: "Panneau de Commande", txtTargetColor: "Couleur Cible", txtTolerance: "Tolérance",
-                txtMinArea: "Surface Min", txtSystemOk: "SYSTÈME OK", txtSystemAlarm: "⚠️ ALARME DÉFAUT",
-                txtHistoryTitle: "📜 Journal des Données", thDate: "Date", thTime: "Heure", thStatus: "État", thPixels: "Pixels",
-                defect: "DÉFAUT", plcStop: "PLC: STOP (1)", plcOk: "PLC: OK (0)", plcErr: "PLC: ERREUR",
-                txtExportTitle: "📥 Exporter l'historique", txtDateStart: "Date Début", txtDateEnd: "Date Fin", txtCancel: "Annuler", txtDownload: "Télécharger"
-            },
-            en: {
-                btnStart: "▶ START", btnStartActive: "● SCANNING ACTIVE", btnReset: "↺ RESET PLC",
-                txtExportBtn: "📥 Export", txtHistoryBtn: "📜 History", txtLogout: "Logout", txtBackBtn: "Back to Camera",
-                txtPanelTitle: "Control Panel", txtTargetColor: "Target Color", txtTolerance: "Tolerance",
-                txtMinArea: "Min Area", txtSystemOk: "SYSTEM OK", txtSystemAlarm: "⚠️ DEFECT ALARM",
-                txtHistoryTitle: "📜 Data Log", thDate: "Date", thTime: "Time", thStatus: "Status", thPixels: "Pixels",
-                defect: "DEFECT", plcStop: "PLC: STOP (1)", plcOk: "PLC: OK (0)", plcErr: "PLC: ERROR",
-                txtExportTitle: "📥 Export History", txtDateStart: "Start Date", txtDateEnd: "End Date", txtCancel: "Cancel", txtDownload: "Download"
-            }
-        };
-
-        // --- VARS ---
-        const video = document.getElementById('video');
+        // VARS
+        const imgStream = document.getElementById('videoStream');
         const canvas = document.getElementById('outputCanvas');
         const ctx = canvas.getContext('2d', { willReadFrequently: true });
-        const dashboardView = document.getElementById('dashboardView');
-        const historyView = document.getElementById('historyView');
-        const historyTableBody = document.getElementById('historyTableBody');
-        const btnLang = document.getElementById('btnLang');
-        
         let isRunning = false, alarmLocked = false;
         let targetHSV = { h: 220, s: 100, v: 100 };
-        let dataLog = []; let currentPixels = 0;
         const WIDTH = 640; const HEIGHT = 480;
         canvas.width = WIDTH; canvas.height = HEIGHT;
 
-        // --- NAVIGATION ---
-        function toggleView(v) {
-            if(v==='history'){ dashboardView.classList.add('hidden'); historyView.classList.remove('hidden'); renderHistoryTable(); }
-            else { historyView.classList.add('hidden'); dashboardView.classList.remove('hidden'); }
-        }
-        function renderHistoryTable() {
-            historyTableBody.innerHTML = "";
-            const recent = dataLog.slice().reverse().slice(0, 500);
-            if(recent.length===0){ historyTableBody.innerHTML=`<tr><td colspan="4" class="p-8 text-center text-gray-500">Aucune donnée.</td></tr>`; return; }
-            recent.forEach(r => {
-                const isDefect = r.etat.includes("DEFECT") || r.etat.includes("DÉFAUT");
-                const cls = isDefect ? "bg-red-900/20 text-red-300" : "text-gray-300";
-                const badge = isDefect ? `<span class="bg-red-600 text-white text-xs px-2 py-1 rounded font-bold">ALARM</span>` : `<span class="bg-green-600/20 text-green-400 text-xs px-2 py-1 rounded">OK</span>`;
-                historyTableBody.innerHTML += `<tr class="hover:bg-slate-700 ${cls}"><td class="p-3 border-b border-slate-700">${r.date}</td><td class="p-3 border-b border-slate-700 font-mono">${r.heure}</td><td class="p-3 border-b border-slate-700">${badge}</td><td class="p-3 border-b border-slate-700 font-mono">${r.pixels} px</td></tr>`;
-            });
-        }
-
-        // --- UI ---
+        // UI LISTENERS
         document.getElementById('rngTol').oninput = (e) => document.getElementById('lblTol').innerText = e.target.value;
         document.getElementById('rngArea').oninput = (e) => document.getElementById('lblArea').innerText = e.target.value;
         document.getElementById('colorPicker').oninput = function() { const rgb=hexToRgb(this.value); targetHSV=rgbToHsv(rgb.r, rgb.g, rgb.b); };
         (() => { const rgb=hexToRgb(document.getElementById('colorPicker').value); targetHSV=rgbToHsv(rgb.r, rgb.g, rgb.b); })();
 
-        function toggleLanguage() { currentLang = currentLang === 'fr' ? 'en' : 'fr'; localStorage.setItem('lang', currentLang); updateInterface(); renderHistoryTable(); }
-        function updateInterface() {
-            const t = translations[currentLang];
-            btnLang.innerText = currentLang === 'fr' ? "🇬🇧 EN" : "🇫🇷 FR";
-            const ids = ['txtExportBtn', 'txtHistoryBtn', 'txtLogout', 'txtBackBtn', 'txtPanelTitle', 'txtTargetColor', 'txtTolerance', 'txtMinArea', 'txtHistoryTitle', 'thDate', 'thTime', 'thStatus', 'thPixels', 'txtExportTitle', 'txtDateStart', 'txtDateEnd', 'txtCancel', 'txtDownload'];
-            ids.forEach(id => { if(document.getElementById(id)) document.getElementById(id).innerText = t[id]; });
-            document.getElementById('btnStart').innerText = isRunning ? t.btnStartActive : t.btnStart;
-            document.getElementById('btnReset').innerText = t.btnReset;
-            if (alarmLocked) {
-                document.getElementById('status').innerText = t.plcStop; document.getElementById('txtSystemStatus').innerText = t.txtSystemAlarm;
-            } else {
-                document.getElementById('status').innerText = document.getElementById('status').innerText.includes("ERREUR") ? t.plcErr : t.plcOk;
-                document.getElementById('txtSystemStatus').innerText = t.txtSystemOk;
-            }
-        }
-        updateInterface();
-
-        function logout() { window.location.href = "/api/logout"; }
-        function openExportModal() { 
-            const n=new Date(); const s=new Date(n.getTime()-3600000); 
-            const fmt=d=>d.toISOString().slice(0,16); 
-            document.getElementById('exportEnd').value=fmt(n); document.getElementById('exportStart').value=fmt(s); 
-            document.getElementById('exportModal').classList.remove('hidden'); 
-        }
-        function closeExportModal() { document.getElementById('exportModal').classList.add('hidden'); }
-        function processExport() {
-            if(dataLog.length===0){ alert("No data."); return; }
-            const s=new Date(document.getElementById('exportStart').value).getTime(); 
-            const e=new Date(document.getElementById('exportEnd').value).getTime();
-            let f=dataLog; if(s&&e) f=dataLog.filter(r=>r.ts>=s && r.ts<=e);
-            if(f.length===0){ alert("No data in range."); return; }
-            let csv="data:text/csv;charset=utf-8,Date;Time;Status;Pixels\r\n";
-            f.forEach(r=>{ csv+=`${r.date};${r.heure};${r.etat};${r.pixels}\r\n`; });
-            const lnk=document.createElement("a"); lnk.href=encodeURI(csv); lnk.download=`Setic_Log_${new Date().toISOString().slice(0,19)}.csv`;
-            document.body.appendChild(lnk); lnk.click(); document.body.removeChild(lnk); closeExportModal();
-        }
-
-        // --- START & LOGGING ---
-        document.getElementById('btnStart').onclick = async () => {
-            try {
-                const s = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 1280 } } });
-                video.srcObject = s; video.play();
-                video.onloadedmetadata = () => {
+        // --- DÉMARRAGE DU STREAM ---
+        document.getElementById('btnStart').onclick = () => {
+            // On connecte l'image au flux du Raspberry Pi
+            imgStream.src = "/api/video_stream";
+            
+            imgStream.onload = () => {
+                if(!isRunning) {
                     isRunning = true;
                     document.getElementById('btnStart').disabled = true;
-                    document.getElementById('btnStart').className = "bg-green-600 text-white py-4 rounded-lg font-bold shadow-inner w-full cursor-default";
+                    document.getElementById('btnStart').className = "w-full bg-green-600 text-white py-4 rounded-lg font-bold cursor-default";
+                    document.getElementById('btnStart').innerText = "● LIVE STREAM ACTIF";
                     document.getElementById('waitingOverlay').classList.add('hidden');
-                    updateInterface(); processLoop(); startLogging();
-                };
-            } catch (e) { alert("Camera Error: " + e.message); }
-        };
-        // --- LOGGER (Vers le Serveur SSD) ---
-        function startLogging() {
-            setInterval(() => {
-                if (!isRunning) return;
-                const now = new Date();
-                const stateTxt = alarmLocked ? (currentLang === 'fr' ? "DÉFAUT" : "DEFECT") : "OK";
-                
-                // 1. Création de l'objet de données
-                const logEntry = {
-                    ts: now.getTime(), 
-                    date: now.toLocaleDateString(),
-                    heure: now.toLocaleTimeString(),
-                    etat: stateTxt,
-                    pixels: currentPixels
-                };
-
-                // 2. Mise à jour affichage local (pour l'historique visuel)
-                dataLog.push(logEntry);
-                document.getElementById('logCount').innerText = dataLog.length;
-                if (dataLog.length > 500) dataLog.shift(); // On garde moins en mémoire car c'est stocké sur le SSD
-
-                // 3. ENVOI AU RASPBERRY PI (SSD)
-                fetch('/api/log', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(logEntry)
-                }).catch(err => console.error("Erreur écriture SSD:", err));
-
-            }, 1000);
-        }
-
-        // --- RESET ---
-        document.getElementById('btnReset').onclick = () => {
-            if(!alarmLocked) return;
-            sendPLC(false); alarmLocked=false;
-            const ind=document.getElementById('alarmIndicator');
-            ind.className="bg-slate-800 border-4 border-slate-600 rounded-xl p-6 flex items-center justify-center shadow-inner transition-all duration-300 min-h-[120px]";
-            document.getElementById('iconStatus').innerText="✅";
-            document.getElementById('txtSystemStatus').className="text-2xl font-bold text-gray-400 tracking-widest";
-            const btn=document.getElementById('btnReset'); btn.disabled=true; btn.classList.add('opacity-50', 'cursor-not-allowed'); btn.classList.remove('animate-pulse', 'ring-4', 'ring-orange-300');
-            updateInterface();
+                    processLoop(); // Lance l'analyse
+                }
+            };
         };
 
-        async function sendPLC(alarm) {
-            const t=translations[currentLang]; const bdg=document.getElementById('status');
-            try { await fetch('/api/alarm',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({alarm:alarm})});
-            if(alarm){ bdg.innerText=t.plcStop; bdg.className="px-4 py-2 bg-red-600 rounded font-bold animate-pulse shadow-lg"; }
-            else{ bdg.innerText=t.plcOk; bdg.className="px-4 py-2 bg-green-600 rounded font-bold transition-all"; }
-            } catch(e){ bdg.innerText=t.plcErr; bdg.className="px-4 py-2 bg-yellow-600 rounded font-bold"; }
-        }
-
-        // --- VISION LOOP (AVEC RGB) ---
+        // --- BOUCLE D'ANALYSE ---
         function processLoop() {
             if(!isRunning) return;
-            ctx.drawImage(video, 0, 0, WIDTH, HEIGHT);
+
+            // 1. Dessiner l'image reçue sur le canvas pour lire les pixels
+            ctx.drawImage(imgStream, 0, 0, WIDTH, HEIGHT);
+            
             const frame = ctx.getImageData(0, 0, WIDTH, HEIGHT);
             const d = frame.data;
             const tol = parseInt(document.getElementById('rngTol').value);
             const thr = parseInt(document.getElementById('rngArea').value);
             
             let cnt=0; let minX=WIDTH, maxX=0, minY=HEIGHT, maxY=0;
-            let sumR=0, sumG=0, sumB=0; // Variables pour calculer la moyenne RGB
+            let sumR=0, sumG=0, sumB=0;
 
             for(let i=0; i<d.length; i+=4) {
                 const r=d[i], g=d[i+1], b=d[i+2];
-                if(r<30 && g<30 && b<30) continue;
+                if(r<30 && g<30 && b<30) continue; // Ignorer le noir/sombre
+
                 const hsv = rgbToHsv(r, g, b);
                 let diff = Math.abs(hsv.h - targetHSV.h);
                 if(diff > 180) diff = 360 - diff;
                 
                 if(diff < tol && hsv.s > 40 && hsv.v > 30) {
-                    cnt++; 
-                    d[i]=255; d[i+1]=0; d[i+2]=0; // Colorier en rouge
-                    
-                    // Accumuler les couleurs pour la moyenne
+                    cnt++;
                     sumR += r; sumG += g; sumB += b;
-
                     const x=(i/4)%WIDTH; const y=Math.floor((i/4)/WIDTH);
                     if(x<minX) minX=x; if(x>maxX) maxX=x; if(y<minY) minY=y; if(y>maxY) maxY=y;
                 }
             }
-            ctx.putImageData(frame, 0, 0);
-            currentPixels = cnt;
 
-            // Trigger Alarm
+            // 2. Nettoyer et Redessiner l'image propre
+            ctx.drawImage(imgStream, 0, 0, WIDTH, HEIGHT);
+
+            // 3. Gestion Alarme
             if(cnt > thr && !alarmLocked) {
-                sendPLC(true); alarmLocked=true;
-                const ind=document.getElementById('alarmIndicator');
-                ind.className="bg-red-600 border-4 border-white rounded-xl p-6 flex items-center justify-center shadow-[0_0_30px_rgba(220,38,38,0.8)] animate-pulse min-h-[120px]";
-                document.getElementById('iconStatus').innerText="⚠️";
-                document.getElementById('txtSystemStatus').className="text-2xl font-bold text-white tracking-widest";
-                const btn=document.getElementById('btnReset'); btn.disabled=false; btn.classList.remove('opacity-50', 'cursor-not-allowed'); btn.classList.add('animate-pulse', 'ring-4', 'ring-orange-300');
-                updateInterface();
+                alarmLocked = true;
+                sendPLC(true); // Envoie l'ordre au Raspberry Pi
+                triggerAlarmUI();
             }
 
-            // Draw Box & Text
+            // 4. Affichage Rectangle & RGB
             if(alarmLocked || cnt > thr) {
-                 if(cnt > thr) {
+                if(cnt > thr) {
                     const w = maxX - minX; const h = maxY - minY;
                     ctx.strokeStyle = "#00FF00"; ctx.lineWidth = 4;
                     ctx.strokeRect(minX, minY, w, h);
                     
-                    // Calcul moyenne RGB
-                    const avgR = Math.round(sumR/cnt);
-                    const avgG = Math.round(sumG/cnt);
-                    const avgB = Math.round(sumB/cnt);
-
-                    // Affichage Texte + RGB
-                    const t = translations[currentLang];
+                    const avgR = Math.round(sumR/cnt); const avgG = Math.round(sumG/cnt); const avgB = Math.round(sumB/cnt);
                     ctx.fillStyle = "#00FF00"; ctx.font = "bold 16px Arial";
-                    ctx.fillText(`${t.defect}: ${cnt}px`, minX, minY - 25);
+                    ctx.fillText(`DÉFAUT: ${cnt}px`, minX, minY - 25);
                     ctx.fillStyle = "#FFFFFF"; ctx.font = "14px monospace";
                     ctx.fillText(`RGB: ${avgR},${avgG},${avgB}`, minX, minY - 8);
-                 }
+                }
             }
             requestAnimationFrame(processLoop);
         }
 
+        // --- COMMUNICATIONS ---
+        async function sendPLC(alarm) {
+            try { await fetch('/api/alarm',{method:'POST',body:JSON.stringify({alarm:alarm})}); } catch(e){console.error(e);}
+        }
+
+        function triggerAlarmUI() {
+            const ind = document.getElementById('alarmIndicator');
+            ind.className = "bg-red-600 border-4 border-white rounded-xl p-6 flex items-center justify-center animate-pulse min-h-[120px]";
+            document.getElementById('txtSystemStatus').innerText = "⚠️ DÉFAUT DÉTECTÉ";
+            document.getElementById('txtSystemStatus').className = "text-2xl font-bold text-white";
+            const btn = document.getElementById('btnReset');
+            btn.disabled = false; btn.className = "w-full bg-orange-600 hover:bg-orange-500 py-4 rounded-lg font-bold animate-pulse";
+        }
+
+        document.getElementById('btnReset').onclick = () => {
+            sendPLC(false); alarmLocked = false;
+            document.getElementById('alarmIndicator').className = "bg-slate-800 border-4 border-slate-600 rounded-xl p-6 flex items-center justify-center min-h-[120px]";
+            document.getElementById('txtSystemStatus').innerText = "SYSTÈME OK";
+            document.getElementById('txtSystemStatus').className = "text-2xl font-bold text-gray-400";
+            document.getElementById('btnReset').disabled = true;
+            document.getElementById('btnReset').className = "w-full bg-orange-600 py-4 rounded-lg font-bold opacity-50 cursor-not-allowed";
+        };
+
+        // --- UTILS ---
         function hexToRgb(h){const r=/^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(h);return r?{r:parseInt(r[1],16),g:parseInt(r[2],16),b:parseInt(r[3],16)}:null}
         function rgbToHsv(r,g,b){r/=255,g/=255,b/=255;const max=Math.max(r,g,b),min=Math.min(r,g,b),d=max-min;let h,s=max===0?0:d/max,v=max;if(max!==min){switch(max){case r:h=(g-b)/d+(g<b?6:0);break;case g:h=(b-r)/d+2;break;case b:h=(r-g)/d+4;break}h/=6}return{h:h*360,s:s*100,v:v*100}}
     </script>

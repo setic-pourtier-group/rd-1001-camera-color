@@ -13,11 +13,10 @@ const CONFIG = {
     LOG_DIR: "./logs" // Dossier lié au SSD via Docker
 };
 
-// --- GESTION PLC (NODES7) ---
+// --- GESTION PLC (Siemens S7) ---
 const conn = new nodes7();
 let plcConnected = false;
 
-// Fonction de connexion avec reconnexion auto
 const connectPLC = () => {
     conn.initiateConnection({ 
         port: 102, 
@@ -32,7 +31,6 @@ const connectPLC = () => {
         } else {
             console.log(`✅ PLC: Connecté à ${CONFIG.PLC_IP}`);
             plcConnected = true;
-            // Définir la variable à écrire (DB1, Byte 0, Bit 0)
             conn.setTranslationCB((tag) => { return [tag]; });
             conn.addItems('VISION_STOP', 'DB1,X0.0'); 
         }
@@ -40,16 +38,14 @@ const connectPLC = () => {
 };
 connectPLC();
 
-// Fonction d'écriture (Promisified)
 const writePLC = async (stop: boolean) => {
     if (!plcConnected) return false;
-    return new Promise((resolve, reject) => {
-        // nodes7 écrit "true" ou "false" directement sur le bit
+    return new Promise((resolve) => {
         conn.writeItems('VISION_STOP', stop, (err) => {
             if (err) {
                 console.error("Erreur écriture PLC", err);
                 plcConnected = false;
-                connectPLC(); // Forcer reconnexion
+                connectPLC();
                 resolve(false);
             } else {
                 resolve(true);
@@ -64,18 +60,14 @@ const writeLog = async (entry: any) => {
     
     const dateStr = new Date().toISOString().slice(0, 10);
     const filename = path.join(CONFIG.LOG_DIR, `log_${dateStr}.csv`);
-    
     const line = `${entry.ts};${entry.date};${entry.heure};${entry.etat};${entry.pixels}\n`;
     
-    // Si fichier vide, ajouter header
     if (!fs.existsSync(filename)) {
         await Bun.write(filename, "Timestamp;Date;Heure;Etat;Pixels\n");
     }
     
-    // Ajouter la ligne (Append)
     const file = Bun.file(filename);
-    const content = await file.text();
-    await Bun.write(filename, content + line);
+    await Bun.write(filename, (await file.text()) + line);
 };
 
 // --- SERVEUR WEB (BUN) ---
@@ -84,61 +76,61 @@ serve({
     async fetch(req) {
         const url = new URL(req.url);
         
-        // 1. LOGIN API
+        // 1. STREAMING VIDEO (Raspberry Pi -> PC)
+        if (url.pathname === "/api/video_stream") {
+            // Lancement de FFmpeg pour capturer la caméra USB
+            const ffmpeg = Bun.spawn([
+                "ffmpeg",
+                "-f", "v4l2",          // Format Linux Video
+                "-framerate", "15",    // 15 FPS pour fluidité réseau
+                "-video_size", "640x480",
+                "-i", "/dev/video0",   // Entrée Caméra
+                "-f", "mjpeg",         // Sortie MJPEG (facile à lire par navigateur)
+                "-"
+            ], {
+                stdout: "pipe"
+            });
+
+            return new Response(ffmpeg.stdout, {
+                headers: {
+                    "Content-Type": "multipart/x-mixed-replace; boundary=ffmpeg",
+                    "Cache-Control": "no-cache"
+                }
+            });
+        }
+
+        // 2. API ALARM (Reçu du PC)
+        if (url.pathname === "/api/alarm" && req.method === "POST") {
+            const body = await req.json();
+            await writePLC(body.alarm);
+            return new Response(JSON.stringify({ status: "OK" }));
+        }
+
+        // 3. API LOG (Reçu du PC)
+        if (url.pathname === "/api/log" && req.method === "POST") {
+            const body = await req.json();
+            writeLog(body);
+            return new Response("Logged");
+        }
+
+        // 4. LOGIN
         if (url.pathname === "/api/login" && req.method === "POST") {
             const body = await req.json();
             if (body.username === CONFIG.USER && body.password === CONFIG.PASS) {
                 const headers = new Headers();
-                // Cookie valable 24h
                 headers.set("Set-Cookie", `session=logged_in; Path=/; Max-Age=86400`);
                 return new Response("OK", { status: 200, headers });
             }
             return new Response("Unauthorized", { status: 401 });
         }
 
-        // 2. LOGOUT API
-        if (url.pathname === "/api/logout") {
-            const headers = new Headers();
-            headers.set("Set-Cookie", `session=; Path=/; Max-Age=0`); // Expire tout de suite
-            headers.set("Location", "/login.html");
-            return new Response("Redirect", { status: 302, headers });
-        }
-
-        // --- MIDDLEWARE AUTHENTIFICATION ---
-        // Pages publiques
-        const publicPaths = ["/login.html", "/image_4.jpg"];
-        if (!publicPaths.includes(url.pathname)) {
-            const cookie = req.headers.get("Cookie") || "";
-            if (!cookie.includes("session=logged_in")) {
-                return Response.redirect("/login.html");
-            }
-        }
-
-        // 3. API ALARM (PLC)
-        if (url.pathname === "/api/alarm" && req.method === "POST") {
-            const body = await req.json();
-            await writePLC(body.alarm);
-            if (body.alarm) console.log("🚨 ARRÊT MACHINE DEMANDÉ");
-            return new Response(JSON.stringify({ status: "OK" }), { headers: { "Content-Type": "application/json" } });
-        }
-
-        // 4. API LOG (SSD)
-        if (url.pathname === "/api/log" && req.method === "POST") {
-            const body = await req.json();
-            writeLog(body);
-            return new Response("Logged", { status: 200 });
-        }
-
-        // 5. SERVIR FICHIERS STATIQUES (FRONTEND)
+        // 5. SERVIR LE FRONTEND
         let filePath = path.join("frontend", url.pathname === "/" ? "index.html" : url.pathname);
         const file = Bun.file(filePath);
-        
-        if (await file.exists()) {
-            return new Response(file);
-        }
+        if (await file.exists()) return new Response(file);
 
         return new Response("Not Found", { status: 404 });
     },
 });
 
-console.log(`⚡ Serveur BUN Vision prêt sur http://localhost:3000`);
+console.log(`⚡ Serveur STREAMING prêt sur http://localhost:3000`);
